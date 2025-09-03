@@ -579,6 +579,64 @@ describe('InfraredBGTMetaVault', () => {
     });
   });
 
+  describe('#allowance invariants (scaffold)', () => {
+    it.skip('clears metaVault->Dolomite allowance after other-token deposit (success path)', async () => {
+      // Route rewards for dToken through testInfraredVault with WETH as reward token
+      await registry
+        .connect(core.governance)
+        .ownerSetRewardVaultOverride(dToken.address, RewardVaultType.Infrared, testInfraredVault.address);
+
+      const rewardAmount = parseEther('0.1');
+      await testInfraredVault.connect(core.hhUser1).setRewardTokens([core.tokens.weth.address]);
+      await core.tokens.weth.connect(core.hhUser1).approve(testInfraredVault.address, rewardAmount);
+      await testInfraredVault.connect(core.hhUser1).notifyRewardAmount(core.tokens.weth.address, rewardAmount);
+
+      // Trigger reward claim path that deposits WETH into Dolomite via factory.depositOtherToken...
+      await vault.connect(core.hhUser1).getReward();
+
+      // Invariant we want enforced by implementation: allowance is cleared back to zero
+      const allowance = await IERC20__factory.connect(core.tokens.weth.address, core.hhUser1).allowance(
+        metaVault.address,
+        core.dolomiteMargin.address,
+      );
+      expect(allowance).eq(0);
+    });
+
+    it.skip('clears both metaVault->iBgtVault and iBgtVault->metaVault allowances after iBGT deposit', async () => {
+      // Create a dedicated iBGT infrared vault and set as the staking vault
+      const iBgtInfraredVault = await createContractWithAbi<TestInfraredVault>(
+        TestInfraredVault__factory.abi,
+        TestInfraredVault__factory.bytecode,
+        [core.tokens.iBgt.address],
+      );
+      await registry.connect(core.governance).ownerSetIBgtStakingVault(iBgtInfraredVault.address);
+
+      const rewardAmount = parseEther('1');
+      await iBgtInfraredVault.connect(core.hhUser1).setRewardTokens([core.tokens.iBgt.address]);
+      await core.tokens.iBgt.connect(core.hhUser1).approve(iBgtInfraredVault.address, rewardAmount);
+      await iBgtInfraredVault.connect(core.hhUser1).notifyRewardAmount(core.tokens.iBgt.address, rewardAmount);
+
+      // Ensure user has an iBGT user vault
+      await iBgtFactory.createVault(core.hhUser1.address);
+      const iBgtVaultAddress = await iBgtFactory.getVaultByAccount(core.hhUser1.address);
+
+      // Call via the child vault to satisfy onlyChildVault
+      const iBgtVault = InfraredBGTIsolationModeTokenVaultV1__factory.connect(iBgtVaultAddress, core.hhUser1);
+      await iBgtVault.getReward();
+
+      const metaToVault = await IERC20__factory.connect(core.tokens.iBgt.address, core.hhUser1).allowance(
+        metaVault.address,
+        iBgtVaultAddress,
+      );
+      const vaultToMeta = await IERC20__factory.connect(core.tokens.iBgt.address, core.hhUser1).allowance(
+        iBgtVaultAddress,
+        metaVault.address,
+      );
+      expect(metaToVault).eq(0);
+      expect(vaultToMeta).eq(0);
+    });
+  });
+
   describe('#getPendingRewardsByAsset', () => {
     it('should work normally for dToken', async () => {
       const infraredImpersonator = await impersonate(core.berachainRewardsEcosystem.infrared.address, true);
