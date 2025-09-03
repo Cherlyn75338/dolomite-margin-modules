@@ -117,6 +117,10 @@ describe('POLPriceOracleV2', () => {
       await core.dolomiteMargin.connect(core.governance).ownerSetIsClosing(marketId, false);
       await expectThrow(oracle.getPrice(factory.address), 'POLPriceOracleV2: POL cannot be borrowable');
     });
+
+    it('should return decimals via IERC20Metadata passthrough', async () => {
+      expect(await oracle.getDecimalsByToken(factory.address)).to.equal(18);
+    });
   });
 
   describe('#getDecimalsByToken', () => {

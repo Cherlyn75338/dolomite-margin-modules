@@ -317,7 +317,12 @@ contract POLIsolationModeWrapperTraderV2 is
     virtual {
         IIsolationModeVaultFactory factory = vaultFactory();
         factory.enqueueTransferIntoDolomiteMargin(_vault, _amount);
-
+        Require.that(
+            _receiver == address(DOLOMITE_MARGIN()),
+            _FILE,
+            "Invalid receiver",
+            _receiver
+        );
         IERC20(address(factory)).safeApprove(_receiver, _amount);
     }
 
