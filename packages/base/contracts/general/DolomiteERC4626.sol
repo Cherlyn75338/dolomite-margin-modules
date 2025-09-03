@@ -67,6 +67,14 @@ contract DolomiteERC4626 is
     uint256 private constant _DOLOMITE_MARGIN_OWNER_ACCOUNT_ID = 3;
 
     // ==================================================================
+    // ============================= Events =============================
+    // ==================================================================
+
+    event LossyPathOwnerWithdrawExcessTokens(uint256 marketId, uint256 amountWei);
+    event LossyPathSupplyCapTemporarilyLifted(uint256 marketId, uint256 previousMaxSupplyWei);
+    event LossyPathSupplyCapRestored(uint256 marketId, uint256 restoredMaxSupplyWei);
+
+    // ==================================================================
     // ========================== Initializer ===========================
     // ==================================================================
 
@@ -580,6 +588,7 @@ contract DolomiteERC4626 is
 
         if (maxSupplyWeiBefore != 0) {
             _ownerSetMaxSupplyWei(maxSupplyWeiBefore, _marketId);
+            emit LossyPathSupplyCapRestored(_marketId, maxSupplyWeiBefore);
         }
 
         emit Transfer(_from, _to, _amount);
@@ -766,6 +775,7 @@ contract DolomiteERC4626 is
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
         _ownerWithdrawExcessTokens();
         uint256 excessTokens = IERC20(asset()).balanceOf(address(this)) - balanceBefore;
+        emit LossyPathOwnerWithdrawExcessTokens(_marketId, excessTokens);
 
         IDolomiteStructs.AssetAmount memory depositAmount = IDolomiteStructs.AssetAmount({
             sign: true,
@@ -793,6 +803,7 @@ contract DolomiteERC4626 is
             if (excessTokens > remainingSupplyAvailable) {
                 // Increase the supply cap temporarily so the admin can deposit
                 _ownerSetMaxSupplyWei(0, _marketId);
+                emit LossyPathSupplyCapTemporarilyLifted(_marketId, maxSupplyWei.value);
                 return maxSupplyWei.value;
             }
         }
