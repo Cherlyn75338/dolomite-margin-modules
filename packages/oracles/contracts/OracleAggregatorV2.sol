@@ -24,6 +24,7 @@ import { IDolomitePriceOracle } from "@dolomite-exchange/modules-base/contracts/
 import { IDolomiteStructs } from "@dolomite-exchange/modules-base/contracts/protocol/interfaces/IDolomiteStructs.sol";
 import { Require } from "@dolomite-exchange/modules-base/contracts/protocol/lib/Require.sol";
 import { IOracleAggregatorV2 } from "./interfaces/IOracleAggregatorV2.sol";
+import { FullMath } from "./utils/FullMath.sol";
 
 
 /**
@@ -85,37 +86,8 @@ contract OracleAggregatorV2 is OnlyDolomiteMargin, IOracleAggregatorV2 {
     view
     returns (IDolomiteStructs.MonetaryPrice memory)
     {
-        OracleInfo[] memory oracleInfos = _tokenInfoMap[_token].oracleInfos;
-        Require.that(
-            oracleInfos.length > 0,
-            _FILE,
-            "No oracles for token",
-            _token
-        );
-
-        uint256 priceTotal;
-        for (uint256 i; i < oracleInfos.length; ++i) {
-            OracleInfo memory oracleInfo = oracleInfos[i];
-            IDolomiteStructs.MonetaryPrice memory price = IDolomitePriceOracle(oracleInfo.oracle).getPrice(_token);
-            address tokenPair = oracleInfo.tokenPair;
-
-            if (tokenPair == address(0)) {
-                priceTotal += price.value * oracleInfo.weight;
-            } else {
-                IDolomiteStructs.MonetaryPrice memory tokenPairPrice = getPrice(tokenPair);
-
-                // Standardize the price to use 36 decimals.
-                uint256 tokenPairDecimals = _tokenInfoMap[tokenPair].decimals;
-                assert(tokenPairDecimals > 0);
-                uint256 tokenPairValueWith36Decimals = tokenPairPrice.value * (10 ** tokenPairDecimals);
-                // Now that the chained price uses 36 decimals (and thus is standardized), we can do easy math.
-                priceTotal += price.value * tokenPairValueWith36Decimals / _ONE_DOLLAR * oracleInfo.weight;
-            }
-        }
-
-        return IDolomiteStructs.MonetaryPrice({
-            value: priceTotal / _WEIGHT_TOTAL
-        });
+        address[] memory visited;
+        return _getPriceWithVisited(_token, visited);
     }
 
     function getTokenInfo(address _token) external view returns (TokenInfo memory) {
@@ -158,5 +130,60 @@ contract OracleAggregatorV2 is OnlyDolomiteMargin, IOracleAggregatorV2 {
             "Invalid weights"
         );
         emit TokenInsertedOrUpdated(_info);
+    }
+
+    function _getPriceWithVisited(
+        address _token,
+        address[] memory _visited
+    ) internal view returns (IDolomiteStructs.MonetaryPrice memory) {
+        OracleInfo[] memory oracleInfos = _tokenInfoMap[_token].oracleInfos;
+        Require.that(
+            oracleInfos.length > 0,
+            _FILE,
+            "No oracles for token",
+            _token
+        );
+
+        // detect cycles
+        for (uint256 i; i < _visited.length; ++i) {
+            Require.that(
+                _visited[i] != _token,
+                _FILE,
+                "Cycle detected"
+            );
+        }
+
+        // append current token to visited path
+        address[] memory nextVisited = new address[](_visited.length + 1);
+        for (uint256 i; i < _visited.length; ++i) {
+            nextVisited[i] = _visited[i];
+        }
+        nextVisited[_visited.length] = _token;
+
+        uint256 priceTotal;
+        for (uint256 i; i < oracleInfos.length; ++i) {
+            OracleInfo memory oracleInfo = oracleInfos[i];
+            IDolomiteStructs.MonetaryPrice memory price = IDolomitePriceOracle(oracleInfo.oracle).getPrice(_token);
+            address tokenPair = oracleInfo.tokenPair;
+
+            if (tokenPair == address(0)) {
+                priceTotal += price.value * oracleInfo.weight;
+            } else {
+                IDolomiteStructs.MonetaryPrice memory tokenPairPrice = _getPriceWithVisited(tokenPair, nextVisited);
+
+                // Standardize the price to use 36 decimals.
+                uint256 tokenPairDecimals = _tokenInfoMap[tokenPair].decimals;
+                Require.that(tokenPairDecimals > 0, _FILE, "Invalid token pair decimals");
+                uint256 tokenPairValueWith36Decimals = tokenPairPrice.value * (10 ** tokenPairDecimals);
+
+                // Use FullMath.mulDiv to avoid overflow during multiplication before division
+                uint256 chainedPrice = FullMath.mulDiv(price.value, tokenPairValueWith36Decimals, _ONE_DOLLAR);
+                priceTotal += chainedPrice * oracleInfo.weight;
+            }
+        }
+
+        return IDolomiteStructs.MonetaryPrice({
+            value: priceTotal / _WEIGHT_TOTAL
+        });
     }
 }
