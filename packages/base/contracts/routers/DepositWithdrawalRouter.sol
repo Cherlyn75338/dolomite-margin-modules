@@ -242,6 +242,7 @@ contract DepositWithdrawalRouter is RouterBase, IDepositWithdrawalRouter {
             // Do an ordinary deposit for the asset
             uint256 weiAmount = _convertParToWei(msg.sender, _toAccountNumber, _marketId, _amountPar);
             marketInfo.token.safeTransferFrom(msg.sender, address(this), weiAmount);
+            IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), 0);
             IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), weiAmount);
 
             _emitEventIfNecessary(/* _accountOwner = */ msg.sender, _toAccountNumber, _eventFlag);
@@ -268,6 +269,7 @@ contract DepositWithdrawalRouter is RouterBase, IDepositWithdrawalRouter {
 
             uint256 weiAmount = _convertParToWei(address(vault), _toAccountNumber, _marketId, _amountPar);
             marketInfo.token.safeTransferFrom(msg.sender, address(this), weiAmount);
+            IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), 0);
             IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), weiAmount);
 
             AccountActionLib.deposit(
@@ -293,9 +295,11 @@ contract DepositWithdrawalRouter is RouterBase, IDepositWithdrawalRouter {
 
             // Par == Wei for isolation mode tokens
             marketInfo.token.safeTransferFrom(msg.sender, address(this), _amountPar);
+            IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), 0);
             IERC20(marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), _amountPar);
 
             marketInfo.factory.enqueueTransferIntoDolomiteMargin(address(vault), _amountPar);
+            marketInfo.token.safeApprove(address(vault), 0);
             marketInfo.token.safeApprove(address(vault), _amountPar);
 
             // Deposits for isolation mode vaults, must first go to the DEFAULT_ACCOUNT_NUMBER
@@ -391,6 +395,7 @@ contract DepositWithdrawalRouter is RouterBase, IDepositWithdrawalRouter {
         uint256 _amountWei,
         EventFlag _eventFlag
     ) internal {
+        IERC20(_marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), 0);
         IERC20(_marketInfo.marketToken).safeApprove(address(DOLOMITE_MARGIN()), _amountWei);
 
         if (!_marketInfo.isIsolationModeAsset && _isolationModeMarketId == 0) {
@@ -439,6 +444,7 @@ contract DepositWithdrawalRouter is RouterBase, IDepositWithdrawalRouter {
             _emitEventIfNecessary(/* _accountOwner = */ address(vault), _toAccountNumber, _eventFlag);
 
             _marketInfo.factory.enqueueTransferIntoDolomiteMargin(address(vault), _amountWei);
+            _marketInfo.token.safeApprove(address(vault), 0);
             _marketInfo.token.safeApprove(address(vault), _amountWei);
 
             // Deposits for isolation mode vaults, must first go to the DEFAULT_ACCOUNT_NUMBER
