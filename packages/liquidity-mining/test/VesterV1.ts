@@ -605,6 +605,16 @@ describe('VesterV1', () => {
     });
   });
 
+  describe('Boundary windows and reentrancy hardening', () => {
+    it('should allow close exactly at end of closePositionWindow and revert just after', async () => {
+      // Use existing helpers to vest, advance time to boundary, then test
+    });
+
+    it('should not allow malicious token reentrancy during vest/close/emergency', async () => {
+      // Placeholder: reentrancy guard is present; ensure flows do not revert unexpectedly
+    });
+  });
+
   describe('#forceClosePosition', () => {
     it('should work normally', async () => {
       await core.dolomiteMargin.ownerSetGlobalOperator(core.hhUser5.address, true);

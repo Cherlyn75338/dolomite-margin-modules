@@ -31,6 +31,12 @@ import {
   MintableStorageVault__factory,
 } from '../src/types';
 import { createOARB } from './liquidity-mining-ecosystem-utils';
+import {
+  MockFeeOnTransferERC20,
+  MockFalseReturnERC20,
+  MockNoReturnERC20,
+  MaliciousReentrantVault,
+} from '../src/types';
 
 const defaultAccountNumber = ZERO_BI;
 const defaultAllocPoint = BigNumber.from('100');
@@ -48,6 +54,10 @@ xdescribe('EmitterMultipleRewardTokens', () => {
   let oARB2: OARB;
   let oARBStorageVault: MintableStorageVault;
   let oARBStorageVault2: MintableStorageVault;
+  let mockNoReturn: MockNoReturnERC20;
+  let mockFalseReturn: MockFalseReturnERC20;
+  let mockFOT: MockFeeOnTransferERC20;
+  let reentrantVault: MaliciousReentrantVault;
   let startTime: number;
 
   before(async () => {
@@ -73,6 +83,20 @@ xdescribe('EmitterMultipleRewardTokens', () => {
       EmitterMultipleRewardTokens__factory.bytecode,
       [core.dolomiteMargin.address, core.dolomiteRegistry.address, ONE_ETH_BI, startTime],
     );
+
+    // Deploy mocks
+    const MockNoReturn = await ethers.getContractFactory('MockNoReturnERC20');
+    mockNoReturn = await MockNoReturn.deploy();
+    await mockNoReturn.deployed();
+    const MockFalseReturn = await ethers.getContractFactory('MockFalseReturnERC20');
+    mockFalseReturn = await MockFalseReturn.deploy();
+    await mockFalseReturn.deployed();
+    const MockFeeOnTransfer = await ethers.getContractFactory('MockFeeOnTransferERC20');
+    mockFOT = await MockFeeOnTransfer.deploy();
+    await mockFOT.deployed();
+    const ReentrantVault = await ethers.getContractFactory('MaliciousReentrantVault');
+    reentrantVault = await ReentrantVault.deploy();
+    await reentrantVault.deployed();
 
     await core.testEcosystem!.testPriceOracle.setPrice(
       oARB.address,
@@ -362,6 +386,75 @@ xdescribe('EmitterMultipleRewardTokens', () => {
       await testEmitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
       await testEmitter.updatePool(core.marketIds.weth);
       expect(await testEmitter.poolLastRewardTime(core.marketIds.weth, oARB.address)).to.eq(startTime);
+    });
+  });
+
+  describe('Non-standard ERC20 reward tokens and reentrancy', () => {
+    it('should not revert accrual when totalAllocPoint is zero (guarded path) and lastRewardTimes advance', async () => {
+      await emitter.connect(core.governance).ownerAddRewardToken(oARB.address, oARBStorageVault.address, true);
+      // add pool with 0 alloc then try update
+      await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, 0, false);
+      await setNextBlockTimestamp(startTime + 10);
+      await emitter.updatePool(core.marketIds.weth);
+      expect(await emitter.poolLastRewardTime(core.marketIds.weth, oARB.address)).to.eq(startTime + 10);
+    });
+
+    it('should handle fee-on-transfer reward token payout without underflowing user debts', async () => {
+      // Register fee-on-transfer token as reward token with mock vault that mints oARB; here we simulate direct transfer by minting to vault
+      const mockVault = await createContractWithAbi<MintableStorageVault>(
+        MintableStorageVault__factory.abi,
+        MintableStorageVault__factory.bytecode,
+        [core.dolomiteMargin.address, oARB.address],
+      );
+      await core.dolomiteMargin.connect(core.governance).ownerSetGlobalOperator(mockVault.address, true);
+      await emitter.connect(core.governance).ownerAddRewardToken(mockFOT.address, mockVault.address, true);
+      await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
+      await emitter.connect(core.hhUser1).deposit(defaultAccountNumber, core.marketIds.weth, wethAmount);
+      await setNextBlockTimestamp(startTime + 1);
+      // Mint reward token to emitter first to allow transfer despite fee, then withdraw to trigger payout
+      await mockFOT.mint(emitter.address, parseEther('10'));
+      await emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI);
+      // Debts updated; we cannot assert exact wallet amount because of fee, but debt should equal amount * acc/share
+      const debt = await emitter.userRewardDebt(core.marketIds.weth, core.hhUser1.address, mockFOT.address);
+      expect(debt).to.be.gt(ZERO_BI);
+    });
+
+    it('should tolerate no-return and false-return tokens for payout calls (smoke)', async () => {
+      const vault1 = await createContractWithAbi<MintableStorageVault>(
+        MintableStorageVault__factory.abi,
+        MintableStorageVault__factory.bytecode,
+        [core.dolomiteMargin.address, oARB.address],
+      );
+      await core.dolomiteMargin.connect(core.governance).ownerSetGlobalOperator(vault1.address, true);
+      await emitter.connect(core.governance).ownerAddRewardToken(mockNoReturn.address, vault1.address, true);
+      await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
+      await emitter.connect(core.hhUser1).deposit(defaultAccountNumber, core.marketIds.weth, wethAmount);
+      await setNextBlockTimestamp(startTime + 1);
+      await mockNoReturn.mint(emitter.address, parseEther('10'));
+      await expect(emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI)).to.not.be.reverted;
+
+      const vault2 = await createContractWithAbi<MintableStorageVault>(
+        MintableStorageVault__factory.abi,
+        MintableStorageVault__factory.bytecode,
+        [core.dolomiteMargin.address, oARB.address],
+      );
+      await core.dolomiteMargin.connect(core.governance).ownerSetGlobalOperator(vault2.address, true);
+      await emitter.connect(core.governance).ownerAddRewardToken(mockFalseReturn.address, vault2.address, true);
+      await setNextBlockTimestamp(startTime + 2);
+      await mockFalseReturn.mint(emitter.address, parseEther('10'));
+      await expect(emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI)).to.not.be.reverted;
+    });
+
+    it('should block reentrancy via malicious vault during payout', async () => {
+      await emitter.connect(core.governance).ownerAddRewardToken(oARB.address, reentrantVault.address, true);
+      await reentrantVault.setTarget(emitter.address);
+      await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
+      await emitter.connect(core.hhUser1).deposit(defaultAccountNumber, core.marketIds.weth, wethAmount);
+      await setNextBlockTimestamp(startTime + 1);
+      await reentrantVault.setShouldReenter(true);
+      await expect(emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI)).to.be.reverted; // if nonReentrant added; otherwise document
+      await reentrantVault.setShouldReenter(false);
+      await expect(emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI)).to.not.be.reverted;
     });
   });
 
