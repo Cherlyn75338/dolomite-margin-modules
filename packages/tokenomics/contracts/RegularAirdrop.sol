@@ -104,6 +104,7 @@ contract RegularAirdrop is BaseClaimWithMerkleProof, IRegularAirdrop {
             DOLO.safeTransfer(msg.sender, _amount);
         } else {
             uint256 veDoloAmount = _amount / 2;
+            DOLO.safeApprove(address(VE_DOLO), 0);
             DOLO.safeApprove(address(VE_DOLO), veDoloAmount);
             VE_DOLO.create_lock_for(veDoloAmount, MAX_LOCK, msg.sender);
             DOLO.safeTransfer(msg.sender, _amount - veDoloAmount);
