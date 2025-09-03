@@ -66,6 +66,18 @@ contract DolomiteERC4626 is
     uint256 private constant _TO_ACCOUNT_ID = 2;
     uint256 private constant _DOLOMITE_MARGIN_OWNER_ACCOUNT_ID = 3;
 
+    // ======== Events =========
+    /**
+     * @dev Emitted when this token temporarily sets the max supply cap to 0 (unlimited) via the lossy transfer path
+     *      to allow the admin to deposit excess tokens. `previousMaxSupplyWei` is the prior non-zero cap.
+     */
+    event MaxSupplyWeiTemporarilyLifted(uint256 marketId, uint256 previousMaxSupplyWei);
+
+    /**
+     * @dev Emitted when this token restores the max supply cap back to its prior value after a lossy transfer.
+     */
+    event MaxSupplyWeiRestored(uint256 marketId, uint256 restoredMaxSupplyWei);
+
     // ==================================================================
     // ========================== Initializer ===========================
     // ==================================================================
@@ -580,6 +592,7 @@ contract DolomiteERC4626 is
 
         if (maxSupplyWeiBefore != 0) {
             _ownerSetMaxSupplyWei(maxSupplyWeiBefore, _marketId);
+            emit MaxSupplyWeiRestored(_marketId, maxSupplyWeiBefore);
         }
 
         emit Transfer(_from, _to, _amount);
@@ -793,6 +806,7 @@ contract DolomiteERC4626 is
             if (excessTokens > remainingSupplyAvailable) {
                 // Increase the supply cap temporarily so the admin can deposit
                 _ownerSetMaxSupplyWei(0, _marketId);
+                emit MaxSupplyWeiTemporarilyLifted(_marketId, maxSupplyWei.value);
                 return maxSupplyWei.value;
             }
         }
