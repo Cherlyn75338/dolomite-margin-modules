@@ -320,6 +320,7 @@ contract VeExternalVesterImplementationV2 is
             /* _withdrawAllIfPossible = */ false
         );
 
+        REWARD_TOKEN.safeApprove(address(VE_TOKEN), 0);
         REWARD_TOKEN.safeApprove(address(VE_TOKEN), position.oTokenAmount);
 
         if (_veTokenId == type(uint256).max) {
@@ -339,7 +340,9 @@ contract VeExternalVesterImplementationV2 is
     function forceClosePosition(
         uint256 _id
     )
-    external {
+    external
+    nonReentrant
+    {
         VestingPosition memory position = _getVestingPositionSlot(_id);
         address positionOwner = ownerOf(_id);
         Require.that(
@@ -359,7 +362,7 @@ contract VeExternalVesterImplementationV2 is
     }
 
     // WARNING: This will forfeit all vesting progress and burn any locked oToken
-    function emergencyWithdraw(uint256 _id) external {
+    function emergencyWithdraw(uint256 _id) external nonReentrant {
         VestingPosition memory position = _getVestingPositionSlot(_id);
         address positionOwner = ownerOf(_id);
         Require.that(
