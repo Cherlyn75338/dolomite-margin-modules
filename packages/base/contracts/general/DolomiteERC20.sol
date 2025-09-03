@@ -62,6 +62,14 @@ contract DolomiteERC20 is
 
     uint256 public immutable CHAIN_ID;
 
+    // ============================ Events ============================
+    /// @notice Emitted when the contract lifts the supply cap to allow an admin deposit during lossy transfer logic
+    event LossySupplyCapLifted(uint256 indexed marketId, uint256 previousMaxSupplyWei);
+    /// @notice Emitted when the contract restores the prior supply cap after a temporary lift during lossy logic
+    event LossySupplyCapRestored(uint256 indexed marketId, uint256 restoredMaxSupplyWei);
+    /// @notice Emitted when the contract triggers an admin withdrawal of excess tokens during lossy logic
+    event LossyOwnerWithdrawExcessTokens(uint256 indexed marketId, uint256 amountWei);
+
     constructor(
         uint256 _chainId
     ) {
@@ -85,10 +93,18 @@ contract DolomiteERC20 is
         _setAddress(_UNDERLYING_TOKEN_SLOT, DOLOMITE_MARGIN().getMarketTokenAddress(_marketId));
     }
 
+    /**
+     * @notice Initializes reentrancy guard state. Must be called before enabling user operations.
+     */
     function initializeVersion2() external reinitializer(2) {
         __ReentrancyGuardUpgradeable__init();
     }
 
+    /**
+     * @notice Sets the Dolomite registry used for receiver validation. Initialization ordering: call
+     *         `initializeVersion2` before this function so reentrancy protection is active. Deployments should not
+     *         enable transfers/mint/redeem for users until after this function completes successfully.
+     */
     function initializeVersion3(address _dolomiteRegistry) external reinitializer(3) {
         _setAddress(_DOLOMITE_REGISTRY_SLOT, _dolomiteRegistry);
     }
@@ -408,6 +424,7 @@ contract DolomiteERC20 is
 
         if (maxSupplyWeiBefore != 0) {
             _ownerSetMaxSupplyWei(maxSupplyWeiBefore, _marketId);
+            emit LossySupplyCapRestored(_marketId, maxSupplyWeiBefore);
         }
 
         emit Transfer(_from, _to, _amount);
@@ -519,6 +536,9 @@ contract DolomiteERC20 is
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
         _ownerWithdrawExcessTokens();
         uint256 excessTokens = IERC20(asset()).balanceOf(address(this)) - balanceBefore;
+        if (excessTokens > 0) {
+            emit LossyOwnerWithdrawExcessTokens(_marketId, excessTokens);
+        }
 
         IDolomiteStructs.AssetAmount memory depositAmount = IDolomiteStructs.AssetAmount({
             sign: true,
@@ -545,6 +565,7 @@ contract DolomiteERC20 is
             if (excessTokens > remainingSupplyAvailable) {
                 // Increase the supply cap temporarily so the admin can deposit
                 _ownerSetMaxSupplyWei(0, _marketId);
+                emit LossySupplyCapLifted(_marketId, maxSupplyWei.value);
                 return maxSupplyWei.value;
             }
         }

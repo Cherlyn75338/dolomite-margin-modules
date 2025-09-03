@@ -76,6 +76,10 @@ contract GenericTraderProxyV2 is GenericTraderProxyBase, ReentrancyGuard, Author
     // ================== External Functions ==================
     // ========================================================
 
+    /**
+     * @notice Executes a swap using the provided trader path. If unsure, callers should set
+     *         `userConfig.balanceCheckFlag` to `BalanceCheckFlag.Both` for safest post-trade checks.
+     */
     function swapExactInputForOutput(
         SwapExactInputForOutputParams memory _params
     ) public nonReentrant {
@@ -89,6 +93,10 @@ contract GenericTraderProxyV2 is GenericTraderProxyBase, ReentrancyGuard, Author
         _swapExactInputForOutput(_accountOwner, _params);
     }
 
+    /**
+     * @notice Executes a swap and optional position modifications. If unsure, callers should set
+     *         `userConfig.balanceCheckFlag` to `BalanceCheckFlag.Both` for safest post-trade checks.
+     */
     function swapExactInputForOutputAndModifyPosition(
         SwapExactInputForOutputAndModifyPositionParams memory _params
     ) public nonReentrant {
