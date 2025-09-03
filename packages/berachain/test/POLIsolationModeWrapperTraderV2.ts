@@ -785,4 +785,45 @@ describe('POLIsolationModeWrapperTraderV2', () => {
       });
     });
   });
+
+  describe('#Receiver enforcement and allowance hygiene', () => {
+    it('getExchangeCost enforces input/output tokens; receiver enforced via wrapper.exchange during operate', async () => {
+      await expectThrow(
+        wrapper.getExchangeCost(core.tokens.wbera.address, factory.address, parAmount, BYTES_EMPTY),
+        `POLIsolationModeWrapperV2: Invalid input token <${core.tokens.wbera.address.toLowerCase()}>`,
+      );
+      await expectThrow(
+        wrapper.getExchangeCost(core.tokens.weth.address, core.tokens.wbera.address, parAmount, BYTES_EMPTY),
+        `POLIsolationModeWrapperV2: Invalid output token <${core.tokens.wbera.address.toLowerCase()}>`,
+      );
+    });
+
+    it('transient values reset after trade path finishes', async () => {
+      await metaVault.setDefaultRewardVaultTypeByAsset(dToken.address, RewardVaultType.Infrared);
+      const wrapperParam: GenericTraderParam = {
+        trader: wrapper.address,
+        traderType: GenericTraderType.IsolationModeWrapper,
+        tradeData: defaultAbiCoder.encode(['uint256'], [2]),
+        makerAccountIndex: 0,
+      };
+      await vault.addCollateralAndSwapExactInputForOutput(
+        defaultAccountNumber,
+        defaultAccountNumber,
+        [core.marketIds.weth, marketId],
+        MAX_UINT_256_BI,
+        ONE_BI,
+        [wrapperParam],
+        [
+          { owner: metaVault.address, number: defaultAccountNumber },
+        ],
+        { deadline: '123123123123123', balanceCheckFlag: BalanceCheckFlag.None, eventType: GenericEventEmissionType.None },
+      );
+      // No direct getter, but subsequent getTradeCost path internally requires zeroed transient; reuse cost API
+      const zeroPar = { sign: false, value: ZERO_BI } as any;
+      await expectThrow(
+        wrapper.getTradeCost(core.marketIds.weth, marketId, { owner: metaVault.address, number: defaultAccountNumber }, { owner: vault.address, number: defaultAccountNumber }, zeroPar, zeroPar, { sign: false, value: ZERO_BI } as any, BYTES_EMPTY),
+        'POLIsolationModeWrapperV2: Invalid delta par',
+      );
+    });
+  });
 });

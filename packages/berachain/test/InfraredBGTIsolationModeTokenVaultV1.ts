@@ -146,6 +146,18 @@ describe('InfraredBGTIsolationModeTokenVaultV1', () => {
       expect(await core.berachainRewardsEcosystem.iBgtStakingPool.balanceOf(metaVault.address)).to.eq(amountWei);
     });
 
+    it('should keep isDepositSourceMetaVault false if transferFrom reverts', async () => {
+      const metaVaultImpersonator = await impersonate(await registry.getMetaVaultByAccount(core.hhUser1.address), true);
+      await iBgtVault.connect(metaVaultImpersonator).setIsDepositSourceMetaVault(true);
+      // Intentionally do not approve iBGT for metaVault->vault transfer to force revert
+      await expectThrow(
+        iBgtVault.connect(metaVaultImpersonator).executeDepositIntoVault(metaVaultImpersonator.address, amountWei),
+        'ERC20: insufficient allowance',
+      );
+      // Flag should be reset to false even though transfer failed
+      expect(await iBgtVault.isDepositSourceMetaVault()).to.eq(false);
+    });
+
     it('should work normally if staking is paused', async () => {
       await testInfraredVault.setRewardTokens([core.tokens.iBgt.address]);
       await core.tokens.iBgt.connect(iBgtWhale).approve(testInfraredVault.address, rewardAmount);
