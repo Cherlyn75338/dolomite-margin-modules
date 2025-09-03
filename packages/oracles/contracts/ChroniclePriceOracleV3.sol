@@ -159,10 +159,22 @@ contract ChroniclePriceOracleV3 is IChroniclePriceOracle, OnlyDolomiteMargin {
             updatedAt
         );
 
+        Require.that(
+            answer > 0,
+            _FILE,
+            "Chronicle price non-positive",
+            _token
+        );
         uint256 chroniclePrice = uint256(answer);
         uint8 valueDecimals = scribe.decimals();
 
         if (_tokenToInvertPriceMap[_token]) {
+            Require.that(
+                chroniclePrice > 0,
+                _FILE,
+                "Cannot invert zero price",
+                _token
+            );
             uint256 decimalFactor = 10 ** uint256(valueDecimals);
             chroniclePrice = (decimalFactor ** 2) / chroniclePrice;
         }
@@ -170,7 +182,12 @@ contract ChroniclePriceOracleV3 is IChroniclePriceOracle, OnlyDolomiteMargin {
         // standardize the Chronicle price to be the proper number of decimals of (36 - tokenDecimals)
         IOracleAggregatorV2 aggregator = IOracleAggregatorV2(address(DOLOMITE_REGISTRY.oracleAggregator()));
         uint8 tokenDecimals = aggregator.getDecimalsByToken(_token);
-        assert(tokenDecimals > 0);
+        Require.that(
+            tokenDecimals > 0,
+            _FILE,
+            "Invalid token decimals",
+            _token
+        );
         uint256 standardizedPrice = standardizeNumberOfDecimals(
             tokenDecimals,
             chroniclePrice,

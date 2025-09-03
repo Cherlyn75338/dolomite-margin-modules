@@ -159,10 +159,22 @@ contract ChaosLabsPriceOracleV3 is IChaosLabsPriceOracleV3, OnlyDolomiteMargin {
             updatedAt
         );
 
+        Require.that(
+            answer > 0,
+            _FILE,
+            "Chaos Labs price non-positive",
+            _token
+        );
         uint256 chaosLabsPrice = uint256(answer);
         uint8 valueDecimals = aggregatorProxy.decimals();
 
         if (_tokenToInvertPriceMap[_token]) {
+            Require.that(
+                chaosLabsPrice > 0,
+                _FILE,
+                "Cannot invert zero price",
+                _token
+            );
             uint256 decimalFactor = 10 ** uint256(valueDecimals);
             chaosLabsPrice = (decimalFactor ** 2) / chaosLabsPrice;
         }
@@ -170,7 +182,12 @@ contract ChaosLabsPriceOracleV3 is IChaosLabsPriceOracleV3, OnlyDolomiteMargin {
         // standardize the price to be the proper number of decimals of (36 - tokenDecimals)
         IOracleAggregatorV2 aggregator = IOracleAggregatorV2(address(DOLOMITE_REGISTRY.oracleAggregator()));
         uint8 tokenDecimals = aggregator.getDecimalsByToken(_token);
-        assert(tokenDecimals > 0);
+        Require.that(
+            tokenDecimals > 0,
+            _FILE,
+            "Invalid token decimals",
+            _token
+        );
         uint256 standardizedPrice = standardizeNumberOfDecimals(
             tokenDecimals,
             chaosLabsPrice,

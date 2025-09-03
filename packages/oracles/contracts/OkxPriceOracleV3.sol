@@ -161,10 +161,22 @@ contract OkxPriceOracleV3 is IChainlinkPriceOracleV3, OnlyDolomiteMargin {
             updatedAt
         );
 
+        Require.that(
+            answer > 0,
+            _FILE,
+            "OKX price non-positive",
+            _token
+        );
         uint256 okxPrice = uint256(answer);
         uint8 valueDecimals = aggregatorProxy.decimals();
 
         if (_tokenToInvertPriceMap[_token]) {
+            Require.that(
+                okxPrice > 0,
+                _FILE,
+                "Cannot invert zero price",
+                _token
+            );
             uint256 decimalFactor = 10 ** uint256(valueDecimals);
             okxPrice = (decimalFactor ** 2) / okxPrice;
         }
@@ -172,7 +184,12 @@ contract OkxPriceOracleV3 is IChainlinkPriceOracleV3, OnlyDolomiteMargin {
         // standardize the OKX price to be the proper number of decimals of (36 - tokenDecimals)
         IOracleAggregatorV2 aggregator = IOracleAggregatorV2(address(DOLOMITE_REGISTRY.oracleAggregator()));
         uint8 tokenDecimals = aggregator.getDecimalsByToken(_token);
-        assert(tokenDecimals > 0);
+        Require.that(
+            tokenDecimals > 0,
+            _FILE,
+            "Invalid token decimals",
+            _token
+        );
         uint256 standardizedPrice = standardizeNumberOfDecimals(
             tokenDecimals,
             okxPrice,

@@ -168,6 +168,12 @@ contract ChainsightPriceOracleV3 is IChainsightPriceOracleV3, OnlyDolomiteMargin
         );
 
         if (_tokenToInvertPriceMap[_token]) {
+            Require.that(
+                price > 0,
+                _FILE,
+                "Cannot invert zero price",
+                _token
+            );
             uint256 decimalFactor = 10 ** uint256(_CHAINSIGHT_PRICE_DECIMALS);
             price = (decimalFactor ** 2) / price;
         }
@@ -175,7 +181,12 @@ contract ChainsightPriceOracleV3 is IChainsightPriceOracleV3, OnlyDolomiteMargin
         // standardize the Chainsight price to be the proper number of decimals of (36 - tokenDecimals)
         IOracleAggregatorV2 aggregator = IOracleAggregatorV2(address(DOLOMITE_REGISTRY.oracleAggregator()));
         uint8 tokenDecimals = aggregator.getDecimalsByToken(_token);
-        assert(tokenDecimals > 0);
+        Require.that(
+            tokenDecimals > 0,
+            _FILE,
+            "Invalid token decimals",
+            _token
+        );
         uint256 standardizedPrice = standardizeNumberOfDecimals(
             tokenDecimals,
             price,

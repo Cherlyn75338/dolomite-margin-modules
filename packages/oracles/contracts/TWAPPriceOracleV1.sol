@@ -27,6 +27,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 import { IAlgebraV3Pool } from "./interfaces/IAlgebraV3Pool.sol";
 import { ITWAPPriceOracleV1 } from "./interfaces/ITWAPPriceOracleV1.sol";
 import { OracleLibrary } from "./utils/OracleLibrary.sol";
+import { FullMath } from "./utils/FullMath.sol";
 
 
 /**
@@ -135,7 +136,9 @@ contract TWAPPriceOracleV1 is ITWAPPriceOracleV1, OnlyDolomiteMargin {
             IDolomiteStructs.MonetaryPrice memory price =
                 DOLOMITE_MARGIN().getMarketPrice(DOLOMITE_MARGIN().getMarketIdByTokenAddress(outputToken));
 
-            totalPrice += _standardizeNumberOfDecimals(price.value * quote, _ORACLE_VALUE_DECIMALS);
+            // Compute (price.value * quote) / TOKEN_DECIMALS_FACTOR safely using mulDiv
+            uint256 standardized = FullMath.mulDiv(price.value, quote, TOKEN_DECIMALS_FACTOR);
+            totalPrice += standardized;
         }
 
         return IDolomiteStructs.MonetaryPrice({
@@ -171,6 +174,11 @@ contract TWAPPriceOracleV1 is ITWAPPriceOracleV1, OnlyDolomiteMargin {
         uint32 _observationInterval
     )
     internal {
+        Require.that(
+            _observationInterval > 0,
+            _FILE,
+            "Invalid observation interval"
+        );
         observationInterval = _observationInterval;
         emit ObservationIntervalUpdated(_observationInterval);
     }

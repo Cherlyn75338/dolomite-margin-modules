@@ -90,7 +90,7 @@ abstract contract ChainlinkAutomationPriceOracle is IChainlinkAutomationPriceOra
         _ownerSetForwarder(_forwarder);
     }
 
-    function initializeForwarder(uint256 _upkeepId) external {
+    function initializeForwarder(uint256 _upkeepId) external onlyDolomiteMarginOwner(msg.sender) {
         Require.that(
             forwarder == address(0),
             _FILE,
@@ -134,11 +134,21 @@ abstract contract ChainlinkAutomationPriceOracle is IChainlinkAutomationPriceOra
     // ============================ Internal Functions ============================
 
     function _ownerSetHeartbeat(uint256 _heartbeat) internal {
+        Require.that(
+            _heartbeat > 0 && _heartbeat <= 7 days,
+            _FILE,
+            "Invalid heartbeat"
+        );
         heartbeat = _heartbeat;
         emit HeartbeatSet(_heartbeat);
     }
 
     function _ownerSetGracePeriod(uint256 _gracePeriod) internal {
+        Require.that(
+            _gracePeriod <= 1 days,
+            _FILE,
+            "Invalid grace period"
+        );
         gracePeriod = _gracePeriod;
         emit GracePeriodSet(_gracePeriod);
     }

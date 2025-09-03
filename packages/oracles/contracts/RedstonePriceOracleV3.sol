@@ -156,10 +156,22 @@ contract RedstonePriceOracleV3 is IRedstonePriceOracleV3, OnlyDolomiteMargin {
             _token
         );
 
+        Require.that(
+            answer > 0,
+            _FILE,
+            "Redstone price non-positive",
+            _token
+        );
         uint256 chainlinkPrice = uint256(answer);
         uint8 valueDecimals = aggregatorProxy.decimals();
 
         if (_tokenToInvertPriceMap[_token]) {
+            Require.that(
+                chainlinkPrice > 0,
+                _FILE,
+                "Cannot invert zero price",
+                _token
+            );
             uint256 decimalFactor = 10 ** uint256(valueDecimals);
             chainlinkPrice = (decimalFactor ** 2) / chainlinkPrice;
         }
@@ -167,7 +179,12 @@ contract RedstonePriceOracleV3 is IRedstonePriceOracleV3, OnlyDolomiteMargin {
         // standardize the Chainlink price to be the proper number of decimals of (36 - tokenDecimals)
         IOracleAggregatorV2 aggregator = IOracleAggregatorV2(address(DOLOMITE_REGISTRY.oracleAggregator()));
         uint8 tokenDecimals = aggregator.getDecimalsByToken(_token);
-        assert(tokenDecimals > 0);
+        Require.that(
+            tokenDecimals > 0,
+            _FILE,
+            "Invalid token decimals",
+            _token
+        );
         uint256 standardizedPrice = standardizeNumberOfDecimals(
             tokenDecimals,
             chainlinkPrice,
