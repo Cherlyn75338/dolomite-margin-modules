@@ -39,6 +39,8 @@ contract AuthorizationBase is IAuthorizationBase, OnlyDolomiteMarginForUpgradeab
 
     mapping(address => bool) private _isCallerAuthorized;
 
+    event CallerAuthorizationUpdated(address indexed caller, bool isAuthorized, address indexed updater);
+
     // ============ Modifiers ============
 
     modifier requireIsCallerAuthorized(address _caller) {
@@ -60,6 +62,7 @@ contract AuthorizationBase is IAuthorizationBase, OnlyDolomiteMarginForUpgradeab
             _caller
         );
         _isCallerAuthorized[_caller] = _isAuthorized;
+        emit CallerAuthorizationUpdated(_caller, _isAuthorized, msg.sender);
     }
 
     function isCallerAuthorized(address _caller) external view returns (bool) {

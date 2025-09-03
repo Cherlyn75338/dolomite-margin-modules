@@ -60,6 +60,10 @@ contract DolomiteERC20 is
     uint256 private constant _TO_ACCOUNT_ID = 2;
     uint256 private constant _DOLOMITE_MARGIN_OWNER_ACCOUNT_ID = 3;
 
+    event LossyOwnerWithdrewExcessTokens(uint256 marketId, uint256 amountWei);
+    event LossyMaxSupplyTemporarilyLifted(uint256 marketId, uint256 previousMaxSupplyWei);
+    event LossyMaxSupplyRestored(uint256 marketId, uint256 restoredMaxSupplyWei);
+
     uint256 public immutable CHAIN_ID;
 
     constructor(
@@ -174,7 +178,7 @@ contract DolomiteERC20 is
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `_amount`.
      */
-    function transfer(address _to, uint256 _amount) public override returns (bool) {
+    function transfer(address _to, uint256 _amount) public override nonReentrant returns (bool) {
         address owner = msg.sender;
         _transfer(owner, _to, _amount);
         return true;
@@ -216,7 +220,7 @@ contract DolomiteERC20 is
         address from,
         address to,
         uint256 _amount
-    ) public override returns (bool) {
+    ) public override nonReentrant returns (bool) {
         address _spender = msg.sender;
         _spendAllowance(from, _spender, _amount);
         _transfer(from, to, _amount);
@@ -404,10 +408,14 @@ contract DolomiteERC20 is
             );
         }
 
-        assert(IERC20(asset()).allowance(address(this), address(DOLOMITE_MARGIN())) == 0);
+        require(
+            IERC20(asset()).allowance(address(this), address(DOLOMITE_MARGIN())) == 0,
+            "ERC20: Allowance not cleared"
+        );
 
         if (maxSupplyWeiBefore != 0) {
             _ownerSetMaxSupplyWei(maxSupplyWeiBefore, _marketId);
+            emit LossyMaxSupplyRestored(_marketId, maxSupplyWeiBefore);
         }
 
         emit Transfer(_from, _to, _amount);
@@ -519,6 +527,9 @@ contract DolomiteERC20 is
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
         _ownerWithdrawExcessTokens();
         uint256 excessTokens = IERC20(asset()).balanceOf(address(this)) - balanceBefore;
+        if (excessTokens > 0) {
+            emit LossyOwnerWithdrewExcessTokens(_marketId, excessTokens);
+        }
 
         IDolomiteStructs.AssetAmount memory depositAmount = IDolomiteStructs.AssetAmount({
             sign: true,
@@ -616,6 +627,9 @@ contract DolomiteERC20 is
                 _maxSupplyWei
             )
         );
+        if (_maxSupplyWei == 0) {
+            emit LossyMaxSupplyTemporarilyLifted(_marketId, 0);
+        }
     }
 
 
