@@ -351,6 +351,26 @@ xdescribe('Emitter', () => {
       await testEmitter.updatePool(core.marketIds.usdc);
       expect((await testEmitter.poolInfo(core.marketIds.usdc)).lastRewardTime).to.eq(startTime);
     });
+
+    it('should not revert when totalAllocPoint is zero (guarded path) and just advance lastRewardTime', async () => {
+      const testEmitter = await createContractWithAbi<Emitter>(
+        Emitter__factory.abi,
+        Emitter__factory.bytecode,
+        [
+          core.dolomiteMargin.address,
+          core.dolomiteRegistry.address,
+          oARB.address,
+          ONE_ETH_BI,
+          startTime,
+        ],
+      );
+      await testEmitter.connect(core.governance).ownerAddPool(core.marketIds.usdc, 0, false);
+      await setNextBlockTimestamp(startTime + 100);
+      await testEmitter.updatePool(core.marketIds.usdc);
+      const pool = await testEmitter.poolInfo(core.marketIds.usdc);
+      expect(pool.lastRewardTime).to.eq(startTime + 100);
+      expect(pool.accOARBPerShare).to.eq(0);
+    });
   });
 
   describe('#ownerAddPool', () => {

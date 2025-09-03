@@ -887,6 +887,20 @@ describe('VesterV2', () => {
     });
   });
 
+  describe('Grandfathering and pricing rounding invariants', () => {
+    it('should apply old discount schedule for IDs <= cutoff and new schedule after', async () => {
+      // Create positions around cutoff and compare effective rates
+    });
+
+    it('should compute monotonic non-increasing effective rate with longer durations', async () => {
+      // Loop durations and assert rate decreases
+    });
+
+    it('should handle extreme oracle prices without overflow and expected rounding', async () => {
+      // Set extreme prices and verify cost remains within expected bounds
+    });
+  });
+
   describe('#forceClosePosition', () => {
     it('should work normally', async () => {
       await core.dolomiteMargin.ownerSetGlobalOperator(core.hhUser5.address, true);

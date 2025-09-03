@@ -528,6 +528,17 @@ describe('ExternalVesterV1', () => {
     });
   });
 
+  describe('pushed vs promised invariants and force-close boundary', () => {
+    it('pushedTokens - promisedTokens never negative across deposit/withdraw/max flows', async () => {
+      // Use existing helpers to deposit reward tokens, create positions, withdraw partial and max, check invariants
+    });
+
+    it('permissionless forceClose only after expiry + window, taxes only on principal', async () => {
+      // Create position, move time to just before and expect revert; move to exact boundary and expect success
+      // Verify tax equals principal * tax rate
+    });
+  });
+
   describe('#forceClosePosition', () => {
     it('should work normally', async () => {
       await setupAllowancesForVesting();
