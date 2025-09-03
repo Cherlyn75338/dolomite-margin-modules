@@ -114,7 +114,13 @@ contract IsolationModeUpgradeableProxy is
     function _safeDelegateCall(address _target, bytes memory _calldata) internal returns (bytes memory) {
         // solhint-disable-next-line avoid-low-level-calls
         (bool isSuccessful, bytes memory result) = _target.delegatecall(_calldata);
-        assert(isSuccessful);
+        if (!isSuccessful) {
+            // Bubble up revert reason
+            assembly {
+                let returndata_size := mload(result)
+                revert(add(32, result), returndata_size)
+            }
+        }
 
         return result;
     }
