@@ -99,6 +99,7 @@ contract ERC4626PriceOracle is IERC4626PriceOracle, OnlyDolomiteMargin {
         uint8 _tokenDecimals,
         uint256 _tokenAmount
     ) public pure returns (uint256) {
+        require(_tokenDecimals <= 18, "ERC4626: decimals > 18");
         uint256 tokenDecimalsFactor = 10 ** (36 - _tokenDecimals * 2);
         return _tokenAmount * tokenDecimalsFactor;
     }

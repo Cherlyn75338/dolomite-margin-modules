@@ -180,6 +180,12 @@ contract RedstonePriceOracleV2 is IRedstonePriceOracleV2, OnlyDolomiteMargin {
             _token
         );
 
+        Require.that(
+            answer > 0,
+            _FILE,
+            "Redstone price non-positive",
+            _token
+        );
         uint256 chainlinkPrice = uint256(answer);
         address tokenPair = _tokenToPairingMap[_token];
 

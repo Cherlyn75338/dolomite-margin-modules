@@ -136,6 +136,11 @@ contract PancakeV3PriceOracleWithModifiers is ITWAPPriceOracleV1, OnlyDolomiteMa
         uint32 _observationInterval
     )
     internal {
+        Require.that(
+            _observationInterval > 0,
+            _FILE,
+            "Invalid observation interval"
+        );
         observationInterval = _observationInterval;
         emit ObservationIntervalUpdated(_observationInterval);
     }
