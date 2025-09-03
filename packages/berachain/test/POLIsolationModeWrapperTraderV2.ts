@@ -224,6 +224,13 @@ describe('POLIsolationModeWrapperTraderV2', () => {
     });
   });
 
+  describe('#receiver trust (scaffold)', () => {
+    it.skip('reverts if receiver is not DolomiteMargin', async () => {
+      // Once validation is added to wrapper.exchange, craft a call that sets a bogus receiver and expect revert
+      expect(true).to.eq(true);
+    });
+  });
+
   describe('#callFunction', () => {
     it('should work normally', async () => {
       await vault.transferIntoPositionWithOtherToken(
