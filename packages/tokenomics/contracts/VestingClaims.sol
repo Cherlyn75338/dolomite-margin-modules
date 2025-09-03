@@ -117,7 +117,7 @@ contract VestingClaims is BaseClaim, IVestingClaims {
     // ======================= User Functions =======================
     // ==============================================================
 
-    function claim() external onlyClaimEnabled {
+    function claim() external onlyClaimEnabled nonReentrant {
         VestingClaimsStorage storage s = _getVestingClaimsStorage();
         address user = getUserOrRemappedAddress(msg.sender);
 

@@ -71,6 +71,8 @@ contract DOLOBuybackPool is IDOLOBuybackPool, OnlyDolomiteMargin {
 
     function exchange(uint256 _oDoloAmount) external {
         uint256 exchangeAmount = _oDoloAmount.mul(exchangeRate);
+        // Explicit balance check for clearer error instead of SafeERC20 revert
+        require(DOLO_TOKEN.balanceOf(address(this)) >= exchangeAmount, "Insufficient DOLO liquidity");
         ODOLO_TOKEN.safeTransferFrom(msg.sender, address(this), _oDoloAmount);
         DOLO_TOKEN.safeTransfer(msg.sender, exchangeAmount);
     }

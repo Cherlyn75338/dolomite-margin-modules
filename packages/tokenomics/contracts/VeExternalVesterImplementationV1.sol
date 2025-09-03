@@ -319,6 +319,7 @@ contract VeExternalVesterImplementationV1 is
             /* _withdrawAllIfPossible = */ false
         );
 
+        REWARD_TOKEN.safeApprove(address(VE_TOKEN), 0);
         REWARD_TOKEN.safeApprove(address(VE_TOKEN), position.oTokenAmount);
 
         if (_veTokenId == type(uint256).max) {
@@ -338,7 +339,8 @@ contract VeExternalVesterImplementationV1 is
     function forceClosePosition(
         uint256 _id
     )
-    external {
+    external
+    nonReentrant {
         VestingPosition memory position = _getVestingPositionSlot(_id);
         address positionOwner = ownerOf(_id);
         Require.that(
@@ -358,7 +360,7 @@ contract VeExternalVesterImplementationV1 is
     }
 
     // WARNING: This will forfeit all vesting progress and burn any locked oToken
-    function emergencyWithdraw(uint256 _id) external {
+    function emergencyWithdraw(uint256 _id) external nonReentrant {
         VestingPosition memory position = _getVestingPositionSlot(_id);
         address positionOwner = ownerOf(_id);
         Require.that(
@@ -654,6 +656,11 @@ contract VeExternalVesterImplementationV1 is
         // Calculate price
         uint256 rewardPriceAdj = _getRewardPriceAdj(_nftId, _duration, _veTokenId, _veLockEndTime);
         uint256 paymentPrice = DOLOMITE_REGISTRY.oracleAggregator().getPrice(address(PAYMENT_TOKEN)).value;
+        Require.that(
+            paymentPrice > 0,
+            _FILE,
+            "Invalid payment token price"
+        );
         paymentAmount = _oTokenAmount * rewardPriceAdj / paymentPrice;
         Require.that(
             paymentAmount <= _maxPaymentAmount,

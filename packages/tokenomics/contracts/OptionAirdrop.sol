@@ -124,7 +124,13 @@ contract OptionAirdrop is BaseClaimWithMerkleProof, IOptionAirdrop {
 
 
         uint256 doloValue = DOLO_PRICE * _claimAmount;
-        uint256 paymentAmount = doloValue / DOLOMITE_MARGIN().getMarketPrice(_marketId).value;
+        uint256 price = DOLOMITE_MARGIN().getMarketPrice(_marketId).value;
+        Require.that(
+            price > 0,
+            _FILE,
+            "Invalid oracle price"
+        );
+        uint256 paymentAmount = doloValue / price;
         AccountActionLib.transfer(
             DOLOMITE_MARGIN(),
             msg.sender,
