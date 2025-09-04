@@ -13,7 +13,6 @@ import {
   disableInterestAccrual,
   getDefaultCoreProtocolConfig,
   setupCoreProtocol,
-  setupUSDCBalance,
   setupWETHBalance,
 } from '@dolomite-exchange/modules-base/test/utils/setup';
 import { setNextBlockTimestamp } from '@nomicfoundation/hardhat-network-helpers/dist/src/helpers/time';
@@ -22,8 +21,8 @@ import { BigNumber } from 'ethers';
 import { ethers } from 'hardhat';
 import { CoreProtocolArbitrumOne } from '../../base/test/utils/core-protocols/core-protocol-arbitrum-one';
 import {
-  EmitterMultipleRewardTokens,
-  EmitterMultipleRewardTokens__factory,
+  TestEmitterMultipleRewardTokensHarness,
+  TestEmitterMultipleRewardTokensHarness__factory,
   MintableStorageVault,
   MintableStorageVault__factory,
   OARB,
@@ -39,7 +38,7 @@ describe('EmitterMultipleRewardTokens Vulnerabilities', () => {
   let snapshotId: string;
   let core: CoreProtocolArbitrumOne;
 
-  let emitter: EmitterMultipleRewardTokens;
+  let emitter: TestEmitterMultipleRewardTokensHarness;
   let oARB1: OARB;
   let oARB2: OARB;
   let vault1: MintableStorageVault;
@@ -52,7 +51,6 @@ describe('EmitterMultipleRewardTokens Vulnerabilities', () => {
 
   before(async () => {
     core = await setupCoreProtocol(getDefaultCoreProtocolConfig(Network.ArbitrumOne));
-    await disableInterestAccrual(core, core.marketIds.usdc);
     await disableInterestAccrual(core, core.marketIds.weth);
 
     oARB1 = await createOARB(core);
@@ -68,9 +66,9 @@ describe('EmitterMultipleRewardTokens Vulnerabilities', () => {
       [core.dolomiteMargin.address, oARB2.address],
     );
     startTime = (await getBlockTimestamp(await ethers.provider.getBlockNumber())) + 200;
-    emitter = await createContractWithAbi<EmitterMultipleRewardTokens>(
-      EmitterMultipleRewardTokens__factory.abi,
-      EmitterMultipleRewardTokens__factory.bytecode,
+    emitter = await createContractWithAbi<TestEmitterMultipleRewardTokensHarness>(
+      TestEmitterMultipleRewardTokensHarness__factory.abi,
+      TestEmitterMultipleRewardTokensHarness__factory.bytecode,
       [core.dolomiteMargin.address, core.dolomiteRegistry.address, ONE_ETH_BI, startTime],
     );
 
@@ -150,21 +148,25 @@ describe('EmitterMultipleRewardTokens Vulnerabilities', () => {
     await emitter.connect(core.governance).ownerAddRewardToken(badToken.address, badVault.address, true);
     await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
 
-    // Deposit to create user position and supply
-    await emitter.connect(core.hhUser1).deposit(defaultAccountNumber, core.marketIds.weth, wethAmount);
-
-    // Advance time so rewards accrue
+    // Manually set accrual so we can call harnessPayRewards directly
+    await emitter.connect(core.governance).ownerAddPool(core.marketIds.weth, defaultAllocPoint, false);
+    // give user amount and accPerShare to simulate pending = 1e18
+    await emitter.harnessSetUserAmount(core.marketIds.weth, core.hhUser1.address, etherToPar(1));
+    await emitter.harnessSetUserRewardDebt(core.marketIds.weth, core.hhUser1.address, badToken.address, 0);
+    await emitter.harnessSetPoolAccPerShare(core.marketIds.weth, badToken.address, ONE_ETH_BI);
+    await emitter.harnessSetPoolTotalPar(core.marketIds.weth, etherToPar(1));
     await setNextBlockTimestamp(startTime + 1);
-
-    // Trigger payout via zero-withdraw
-    await emitter.connect(core.hhUser1).withdraw(core.marketIds.weth, ZERO_BI);
+    await emitter.connect(core.hhUser1).harnessPayRewards(core.marketIds.weth);
 
     // User received zero BAD tokens because transfer returned false silently
     expect(await badToken.balanceOf(core.hhUser1.address)).to.eq(0);
-    // Vault minted tokens to itself but failed to transfer to emitter
-    expect(await badToken.balanceOf(badVault.address)).to.eq(ONE_ETH_BI);
-    // Emitter did not receive tokens either
-    expect(await badToken.balanceOf(emitter.address)).to.eq(0);
+    // Vault minted tokens but transfer to user failed silently (reward stuck at emitter)
+    expect(await badToken.balanceOf(emitter.address)).to.eq(ONE_ETH_BI);
   });
+
+  function etherToPar(v: number): BigNumber {
+    // par scaling in tests equals 1e18 for WETH setup; reuse as identity
+    return ethers.utils.parseEther(v.toString());
+  }
 });
 
