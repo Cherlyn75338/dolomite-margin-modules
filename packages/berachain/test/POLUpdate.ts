@@ -89,7 +89,7 @@ describe.skip('POLUpdate', () => {
   });
 
   describe('#POLBalanceMapping', () => {
-    it.only('should have correct balance, total supply, and missing amount', async () => {
+    it('should have correct balance, total supply, and missing amount', async () => {
       const totalSupply = await polFactory.totalSupply();
       let totalSupplySum = BigNumber.from(0);
       let missingPolAmount = BigNumber.from(0);
