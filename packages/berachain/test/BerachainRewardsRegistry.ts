@@ -423,6 +423,16 @@ describe('BerachainRewardsRegistry', () => {
         .equal(ethers.utils.keccak256(MetaVaultUpgradeableProxy__factory.bytecode));
     });
 
+    it('should emit events that can be monitored for alerts', async () => {
+      const tx = await registry.connect(core.governance)
+        .ownerSetMetaVaultProxyCreationCode(MetaVaultUpgradeableProxy__factory.bytecode);
+      const receipt = await tx.wait();
+      const evt = receipt.events!.find((e) => e.event === 'MetaVaultProxyCreationCodeSet');
+      expect(evt).to.not.be.undefined;
+      // @ts-ignore
+      expect(evt!.args!.proxyInitHash).to.equal(ethers.utils.keccak256(MetaVaultUpgradeableProxy__factory.bytecode));
+    });
+
     it('should fail when not called by owner', async () => {
       await expectThrow(
         registry.connect(core.hhUser1).ownerSetMetaVaultProxyCreationCode(MetaVaultUpgradeableProxy__factory.bytecode),

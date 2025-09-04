@@ -449,6 +449,79 @@ describe('POLIsolationModeWrapperTraderV2', () => {
         `OnlyDolomiteMargin: Only Dolomite can call function <${core.hhUser1.address.toLowerCase()}>`,
       );
     });
+
+    it('should fail if receiver is not DolomiteMargin', async () => {
+      const dolomiteMarginImpersonator = await impersonate(core.dolomiteMargin.address, true);
+      await vault.transferIntoPositionWithOtherToken(
+        defaultAccountNumber,
+        borrowAccountNumber,
+        core.marketIds.weth,
+        amountWei,
+        BalanceCheckFlag.None,
+      );
+      await wrapper
+        .connect(dolomiteMarginImpersonator)
+        .callFunction(
+          core.genericTraderProxy.address,
+          { owner: vault.address, number: borrowAccountNumber },
+          defaultAbiCoder.encode(
+            ['uint256', 'address', 'uint256'],
+            [MAX_UINT_256_BI, vault.address, borrowAccountNumber],
+          ),
+        );
+      await expectThrow(
+        wrapper
+          .connect(dolomiteMarginImpersonator)
+          .exchange(
+            vault.address,
+            core.hhUser1.address, // invalid receiver
+            factory.address,
+            core.tokens.weth.address,
+            ZERO_BI,
+            defaultAbiCoder.encode(['uint256', 'bytes'], [ONE_BI, sampleTradeData]),
+          ),
+        `POLIsolationModeWrapperV2: Invalid receiver <${core.hhUser1.address.toLowerCase()}>`,
+      );
+    });
+
+    it('should have zero approval before and after exchange', async () => {
+      const dolomiteMarginImpersonator = await impersonate(core.dolomiteMargin.address, true);
+      await vault.transferIntoPositionWithOtherToken(
+        defaultAccountNumber,
+        borrowAccountNumber,
+        core.marketIds.weth,
+        amountWei,
+        BalanceCheckFlag.None,
+      );
+      await wrapper
+        .connect(dolomiteMarginImpersonator)
+        .callFunction(
+          core.genericTraderProxy.address,
+          { owner: vault.address, number: borrowAccountNumber },
+          defaultAbiCoder.encode(
+            ['uint256', 'address', 'uint256'],
+            [MAX_UINT_256_BI, vault.address, borrowAccountNumber],
+          ),
+        );
+
+      const factoryToken = DolomiteERC4626__factory.connect(factory.address, core.hhUser1);
+      const before = await factoryToken.allowance(wrapper.address, core.dolomiteMargin.address);
+      expect(before).to.equal(ZERO_BI);
+
+      await wrapper
+        .connect(dolomiteMarginImpersonator)
+        .exchange(
+          vault.address,
+          core.dolomiteMargin.address,
+          factory.address,
+          core.tokens.weth.address,
+          ZERO_BI,
+          defaultAbiCoder.encode(['uint256', 'bytes'], [ONE_BI, sampleTradeData]),
+        );
+
+      const after = await factoryToken.allowance(wrapper.address, core.dolomiteMargin.address);
+      expect(after).to.equal(ZERO_BI);
+    });
   });
 
   describe('#getTradeCost', () => {

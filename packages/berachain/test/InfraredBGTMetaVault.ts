@@ -571,6 +571,20 @@ describe('InfraredBGTMetaVault', () => {
       await expectWalletBalance(metaVault, dToken, parAmount);
     });
 
+    it('should compute small-fee rounding correctly', async () => {
+      const vaultImpersonator = await impersonate(vault.address, true);
+      await vault.unstake(RewardVaultType.Infrared, parAmount);
+      await expectWalletBalance(metaVault, dToken, parAmount);
+
+      await registry.connect(dolomiteOwnerImpersonator).ownerSetPolFeeAgent(core.hhUser5.address);
+      await registry.connect(dolomiteOwnerImpersonator).ownerSetPolFeePercentage(1); // 1 wei out of 1e18
+      const before = await dToken.balanceOf(core.hhUser5.address);
+      const expected = parAmount.div(parseEther('1'));
+      await metaVault.connect(vaultImpersonator).chargeDTokenFee(dToken.address, marketId, parAmount);
+      const after = await dToken.balanceOf(core.hhUser5.address);
+      expect(after.sub(before)).to.eq(expected);
+    });
+
     it('should fail if not called by child vault', async () => {
       await expectThrow(
         metaVault.connect(core.hhUser1).chargeDTokenFee(dToken.address, marketId, parAmount),
@@ -586,7 +600,6 @@ describe('InfraredBGTMetaVault', () => {
       await infraredVault.connect(infraredImpersonator).notifyRewardAmount(core.tokens.iBgt.address, parseEther('100'));
 
       await increase(10 * ONE_DAY_SECONDS);
-      console.log(await metaVault.getPendingRewardsByAsset(dToken.address));
       const pendingRewards = await metaVault.getPendingRewardsByAsset(dToken.address);
       expect(pendingRewards[0].amount.gt(0)).to.be.true;
       expect(pendingRewards[0].token).to.equal(core.tokens.iBgt.address);
