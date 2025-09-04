@@ -22,5 +22,10 @@
     "url": "https://github.com/dolomite-exchange/dolomite-margin-modules.git",
     "directory": "packages/oracles"
   },
-  "license": "GPL-2.0"
+  "license": "GPL-2.0",
+  "devDependencies": {
+    "@dolomite-exchange/modules-admin": "workspace:*",
+    "@dolomite-exchange/modules-base": "workspace:*",
+    "tsconfig-paths": "^4.2.0"
+  }
 }

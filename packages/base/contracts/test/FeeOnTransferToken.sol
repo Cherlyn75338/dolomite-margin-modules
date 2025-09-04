@@ -64,14 +64,14 @@ contract FeeOnTransferToken is ERC20 {
         treasury = _treasury;
     }
 
-    function _update(address from, address to, uint256 value) internal override {
+    function _transfer(address from, address to, uint256 amount) internal override {
         if (from != address(0) && to != address(0) && feeBps != 0) {
-            uint256 fee = (value * feeBps) / 10000;
-            uint256 amountAfterFee = value - fee;
-            super._update(from, treasury, fee);
-            super._update(from, to, amountAfterFee);
+            uint256 fee = (amount * feeBps) / 10000;
+            uint256 amountAfterFee = amount - fee;
+            super._transfer(from, treasury, fee);
+            super._transfer(from, to, amountAfterFee);
         } else {
-            super._update(from, to, value);
+            super._transfer(from, to, amount);
         }
     }
 }
