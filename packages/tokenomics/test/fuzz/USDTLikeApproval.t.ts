@@ -1,8 +1,7 @@
 import { expect } from 'chai';
 import { Network, ONE_WEEK_SECONDS } from 'packages/base/src/utils/no-deps-constants';
-import { setupCoreProtocol } from 'packages/base/test/utils/setup';
-import { CoreProtocolArbitrumOne } from 'packages/base/test/utils/core-protocols/core-protocol-arbitrum-one';
-import { createContractWithAbi } from 'packages/base/src/utils/dolomite-utils';
+import { ethers } from 'hardhat';
+import { createContractWithAbi } from '../../src/utils/dolomite-utils-local';
 import {
   TestNonStandardUSDT__factory,
   VeExternalVesterImplementationV1,
@@ -12,11 +11,7 @@ import {
 } from '../../src/types';
 
 describe('Fuzz: USDT-like approvals in vesters and claims', () => {
-  let core: CoreProtocolArbitrumOne;
-
-  before(async () => {
-    core = await setupCoreProtocol({ network: Network.ArbitrumOne, blockNumber: 219_404_000 });
-  });
+  before(async () => {});
 
   it('vester V1/V2 should handle safeApprove zero-first semantics for REWARD_TOKEN -> VE', async () => {
     const usdt = await createContractWithAbi(
@@ -28,7 +23,7 @@ describe('Fuzz: USDT-like approvals in vesters and claims', () => {
     const v1 = await createContractWithAbi<VeExternalVesterImplementationV1>(
       VeExternalVesterImplementationV1__factory.abi,
       VeExternalVesterImplementationV1__factory.bytecode,
-      [core.dolomiteMargin.address, core.dolomiteRegistry.address, usdt.address, 0, usdt.address, 0, usdt.address, 0],
+      [ethers.constants.AddressZero, ethers.constants.AddressZero, usdt.address, 0, usdt.address, 0, usdt.address, 0],
     );
     await expect(v1.initialize('0x')).to.not.be.reverted;
 
@@ -42,7 +37,7 @@ describe('Fuzz: USDT-like approvals in vesters and claims', () => {
     const v2 = await createContractWithAbi<VeExternalVesterImplementationV2>(
       VeExternalVesterImplementationV2__factory.abi,
       VeExternalVesterImplementationV2__factory.bytecode,
-      [core.dolomiteMargin.address, core.dolomiteRegistry.address, usdt.address, 0, usdt.address, 0, usdt.address, 0],
+      [ethers.constants.AddressZero, ethers.constants.AddressZero, usdt.address, 0, usdt.address, 0, usdt.address, 0],
     );
     await expect(v2.initialize('0x')).to.not.be.reverted;
     expect(v2.address).to.be.properAddress;

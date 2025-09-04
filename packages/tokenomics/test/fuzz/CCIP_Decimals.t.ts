@@ -1,8 +1,6 @@
 import { expect } from 'chai';
-import { setupCoreProtocol } from 'packages/base/test/utils/setup';
-import { CoreProtocolArbitrumOne } from 'packages/base/test/utils/core-protocols/core-protocol-arbitrum-one';
 import { Network, ONE_ETH_BI } from 'packages/base/src/utils/no-deps-constants';
-import { createContractWithAbi } from 'packages/base/src/utils/dolomite-utils';
+import { createContractWithAbi } from '../../src/utils/dolomite-utils-local';
 import {
   LockReleaseTokenPool,
   LockReleaseTokenPool__factory,
@@ -11,11 +9,7 @@ import {
 } from '../../src/types';
 
 describe('Fuzz: CCIP decimals conversion vectors', () => {
-  let core: CoreProtocolArbitrumOne;
-
-  before(async () => {
-    core = await setupCoreProtocol({ network: Network.ArbitrumOne, blockNumber: 295_821_500 });
-  });
+  before(async () => {});
 
   it('truncate when remote has more decimals; overflow guard when local has more', async () => {
     const token = await createContractWithAbi<DOLO>(DOLO__factory.abi, DOLO__factory.bytecode, [core.dolomiteMargin.address, core.hhUser1.address]);

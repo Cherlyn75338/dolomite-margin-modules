@@ -1,18 +1,20 @@
 import { expect } from 'chai';
-import { setupCoreProtocol } from 'packages/base/test/utils/setup';
-import { CoreProtocolArbitrumOne } from 'packages/base/test/utils/core-protocols/core-protocol-arbitrum-one';
-import { Network } from 'packages/base/src/utils/no-deps-constants';
-import { createContractWithAbi } from 'packages/base/src/utils/dolomite-utils';
+import { ethers } from 'hardhat';
+import { createContractWithAbi } from '../../src/utils/dolomite-utils-local';
 import {
   VeExternalVesterImplementationV1__factory,
   VeExternalVesterImplementationV2__factory,
 } from '../../src/types';
 
 describe('Fuzz: Vester.lazyInitialize guard', () => {
-  let core: CoreProtocolArbitrumOne;
-
+  const core: any = {} as any;
   before(async () => {
-    core = await setupCoreProtocol({ network: Network.ArbitrumOne, blockNumber: 219_404_000 });
+    const signers = await ethers.getSigners();
+    core.dolomiteMargin = { address: ethers.constants.AddressZero };
+    core.dolomiteRegistry = { address: ethers.constants.AddressZero };
+    core.testToken = { address: ethers.constants.AddressZero };
+    core.hhUser2 = signers[1];
+    core.hhUser3 = signers[2];
   });
 
   it('attacker cannot call lazyInitialize before owner (expected to revert once guard added)', async () => {
