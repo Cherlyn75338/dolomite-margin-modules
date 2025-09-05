@@ -5,6 +5,7 @@
     "build": "hardhat compile",
     "clean": "hardhat clean",
     "test": "hardhat --network hardhat test",
+    "test:fuzz": "OFFLINE_TESTS=true hardhat --network hardhat test test/fuzz/*.ts test/fuzz/*.t.ts",
     "coverage": "yarn coverage:prepare && COVERAGE=true node --max-old-space-size=32768 ../../node_modules/.bin/hardhat coverage --testfiles \"test/*.ts\" --solcoverjs ../../.solcover.js",
     "coverage:prepare": "ts-node ../../scripts/fix-contracts-for-coverage.ts tokenomics",
     "coverage:specific": "yarn coverage:prepare && COVERAGE=true node --max-old-space-size=32768 ../../node_modules/.bin/hardhat coverage --testfiles \"test/FeeRebateRollingClaims.ts\" --solcoverjs ../../.solcover.js",
