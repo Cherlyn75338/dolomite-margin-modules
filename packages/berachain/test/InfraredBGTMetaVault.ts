@@ -441,6 +441,27 @@ describe('InfraredBGTMetaVault', () => {
       await expectProtocolBalance(core, vault, defaultAccountNumber, marketId, parAmount);
     });
 
+    it('should reset allowance to Dolomite on other-token deposit failure and transfer to owner', async () => {
+      const infraredImpersonator = await impersonate(core.berachainRewardsEcosystem.infrared.address, true);
+      await core.tokens.honey.connect(infraredImpersonator).approve(testInfraredVault.address, parseEther('100'));
+      await testInfraredVault.setRewardTokens([core.tokens.honey.address]);
+      await testInfraredVault.connect(infraredImpersonator).addReward(core.tokens.honey.address, parseEther('100'));
+      await registry
+        .connect(dolomiteOwnerImpersonator)
+        .ownerSetRewardVaultOverride(dToken.address, RewardVaultType.Infrared, testInfraredVault.address);
+
+      // Force deposit failure by setting max supply extremely low
+      await core.dolomiteMargin.connect(dolomiteOwnerImpersonator).ownerSetMaxSupplyWei(core.marketIds.honey, ONE_BI);
+      const rewards = await testInfraredVault.getAllRewardsForUser(metaVault.address);
+      await vault.getReward();
+
+      // Tokens should be transferred to owner wallet
+      await expectWalletBalance(core.hhUser1, core.tokens.honey, rewards[0].amount);
+      // And allowance back to Dolomite should be zeroed out
+      const allowance = await core.tokens.honey.allowance(metaVault.address, core.dolomiteMargin.address);
+      expect(allowance.eq(0)).to.be.true;
+    });
+
     it('should work normally for reward not listed on dolomite', async () => {
       const rewardAmount = parseEther('1000');
       const testToken = await createTestToken();
